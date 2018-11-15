@@ -1,0 +1,60 @@
+# From PHP 7.1 FPM based on Alpine Linux
+FROM php:7.1-fpm-alpine
+
+# Maintainer
+MAINTAINER Abel Moreno <abel.moreno.acevedo@gmail.com>
+
+# Install dependencies 
+RUN apk update && apk add autoconf openssl-dev g++ make zip libzip-dev
+RUN apk --update add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/v3.6/main curl curl-dev 
+RUN apk --update add --no-cache \
+    --repository http://dl-cdn.alpinelinux.org/alpine/edge/main \
+    --repository http://dl-cdn.alpinelinux.org/alpine/edge/community \
+    --repository http://dl-cdn.alpinelinux.org/alpine/v3.6/main \
+      shadow libxml2-dev freetype-dev libpng-dev libjpeg-turbo-dev imagemagick-dev icu-dev gcc g++ autoconf make \
+    && docker-php-ext-configure gd \
+        --with-gd \
+        --with-freetype-dir=/usr/include/ \
+        --with-png-dir=/usr/include/ \
+        --with-jpeg-dir=/usr/include/ \
+    && yes '' | pecl install apcu-5.1.8 \
+    && docker-php-ext-install ctype curl dom gd hash iconv intl json mbstring mysqli opcache pdo pdo_mysql phar posix session simplexml sockets tokenizer xml xmlrpc xmlwriter zip \
+    && docker-php-ext-enable apcu \
+    && apk add sqlite \
+    && apk add socat \
+	&& apk del gcc g++ autoconf make \
+	&& rm -rf /var/cache/apk/*
+
+# Install composer
+RUN curl -fsSL https://getcomposer.org/installer | php \
+    && mv composer.phar /usr/local/bin/composer 
+
+# Install laravel
+RUN composer global require "laravel/installer" 
+ENV PATH="/root/.composer/vendor/bin:${PATH}"
+
+# Install Xdebug
+RUN apk add --no-cache $PHPIZE_DEPS \
+    && pecl install xdebug \
+    && docker-php-ext-enable xdebug
+
+# Install NodeJs
+RUN apk add --update \
+           bash \ 
+           libpng-dev \
+           gcc \
+           make
+RUN apk update; 
+RUN apk add nodejs; 
+RUN apk add npm;
+
+# Set aliases
+RUN echo '\
+        alias p="/code/lets-build-a-forum-with-laravel/vendor/bin/phpunit" ; \
+        alias pf="/code/lets-build-a-forum-with-laravel/vendor/bin/phpunit --filter" ; \
+        alias art="php artisan" ; \
+        ' >> /etc/bash.bashrc && \
+        echo '. ~/.bashrc' > /root/.bash_profile && \
+        echo '. /etc/bash.bashrc' > /root/.bashrc
+
+ENV LANG en_US.utf8 
